@@ -1,5 +1,5 @@
 #include "main.h"
-#define mode_ STEPPER_MODE_HALFSTEP
+#define mode_ STEPPER_MODE_STEP
 
 int main(void)
 {
