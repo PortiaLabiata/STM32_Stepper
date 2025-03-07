@@ -2,7 +2,7 @@
 
 uint32_t CircBuffer_Next(circular_buffer_t* buffer)
 {
-  if (buffer->index == buffer->size) buffer->index = 0;
+  if (buffer->index == buffer->size-1) buffer->index = 0;
   return buffer->array[buffer->index++];
 }
 
