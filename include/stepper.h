@@ -12,6 +12,8 @@
 
 #include "circ_buffer.h"
 
+/* Macroses */
+
 /* Magic numbers */
 
 #define GPIO_MASK 0b1111L;

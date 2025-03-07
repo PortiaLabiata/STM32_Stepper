@@ -2,21 +2,21 @@
 
 /* Pin configurations */
 
-uint32_t PinConf_Wavemode[4] = {
+static uint32_t PinConf_Wavemode[4] = {
     0b1000L,
     0b0100L,
     0b0010L,
     0b0001L
 };
   
-uint32_t PinConf_Stepmode[4] = {
+static uint32_t PinConf_Stepmode[4] = {
+    0b1001L,
     0b1100L,
     0b0110L,
-    0b0011L,
-    0b1001L
+    0b0011L
 };
   
-uint32_t PinConf_HalfStepmode[7] = {
+static uint32_t PinConf_HalfStepmode[7] = {
     0b1000L,
     0b1100L,
     0b0100L,
@@ -28,12 +28,11 @@ uint32_t PinConf_HalfStepmode[7] = {
 
 /* Global variables */
 
-circular_buffer_t current_buffer;
+static circular_buffer_t current_buffer;
 
-uint32_t iCurrentPin_Conf;
-StepperModes current_mode;
-StepperDirec current_direc;
-uint32_t steps_left = 0;
+static StepperModes current_mode;
+static StepperDirec current_direc;
+static uint32_t steps_left = 0;
 
 GPIO_InitTypeDef GPIO_InitStruct;
 TIM_HandleTypeDef htim3;
@@ -71,6 +70,16 @@ void Stepper_Step(int steps, StepperDirec direc, StepperModes mode)
     current_buffer.index = !direc ? 0 : size_-1;
     steps_left = (mode != STEPPER_MODE_HALFSTEP ? steps : steps*2);
     HAL_TIM_Base_Start_IT(&htim3);
+}
+
+void Stepper_GetMode(void)
+{
+  return current_mode;
+}
+
+void Stepper_GetDirec(void)
+{
+  return current_direc;
 }
 
 /* Interrupt handlers and callbacks */
