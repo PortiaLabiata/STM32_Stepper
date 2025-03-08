@@ -35,13 +35,12 @@ static uint32_t steppers_num = 0;
 
 ConfigState Stepper_Init(Stepper_InitStruct_t *stepper)
 {
-  if (steppers_num >= MAX_STEPPERS) return STEPPER_ERROR;
+  if (steppers_num > MAX_STEPPERS) return STEPPER_ERROR;
 
   // TIM3_Config(TIM3, stepper->period, stepper->presc);
   // GPIO_Config(stepper->gpios);
 
   stepper->__state = STEPPER_STATE_READY;
-  stepper = stepper;
   steppers[steppers_num++] = stepper;
   return STEPPER_OK;
 }
@@ -137,5 +136,5 @@ void Stepper_SingleStep(TIM_HandleTypeDef *htim)
   else if (stepper->__direc == STEPPER_DIRECTION_REVERSE)
       GPIOA->ODR |= CircBuffer_Prev(&stepper->__buffer);
 
-  if (stepper->__steps_left != RUN_INDEFINETLY) stepper->__steps_left--;
+  if (stepper->__steps_left != RUN_INDEFINITELY) stepper->__steps_left--;
 }

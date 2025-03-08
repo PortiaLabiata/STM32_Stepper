@@ -20,7 +20,7 @@
 /* Magic numbers */
 
 #define GPIO_MASK 0b1111L;
-#define RUN_INDEFINETLY -1
+#define RUN_INDEFINITELY -1
 #define MAX_STEPPERS 4
 
 typedef enum {
