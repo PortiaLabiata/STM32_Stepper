@@ -8,7 +8,7 @@
 typedef struct {
     uint32_t* array;
     uint32_t size;
-    uint32_t index;
+    int32_t index;
   } circular_buffer_t;
 
 /* Functions */

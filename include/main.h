@@ -23,15 +23,7 @@
 extern GPIO_InitTypeDef GPIO_InitStruct;
 extern TIM_HandleTypeDef htim3;
 
-extern uint32_t iCurrentPin_Conf;
-extern StepperModes current_mode;
-extern StepperDirec current_direc;
-extern uint16_t current_period;
-extern circular_buffer_t current_buffer;
-
-extern uint32_t PinConf_Wavemode[4];
-extern uint32_t PinConf_Stepmode[4];
-extern uint32_t PinConf_HalfStepmode[8];
+extern uint16_t gpios[4];
 
 /* User functions */
 

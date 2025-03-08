@@ -5,3 +5,13 @@ void SysTick_Handler(void)
 {
     HAL_IncTick();
 }
+
+void TIM3_IRQHandler(void)
+{
+    HAL_TIM_IRQHandler(&htim3);
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
+{
+  Stepper_SingleStep(htim);
+}
