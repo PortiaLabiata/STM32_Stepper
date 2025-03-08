@@ -28,58 +28,85 @@ static uint32_t PinConf_HalfStepmode[7] = {
 
 /* Global variables */
 
-static circular_buffer_t current_buffer;
-
-static StepperModes current_mode;
-static StepperDirec current_direc;
-static uint32_t steps_left = 0;
-
 GPIO_InitTypeDef GPIO_InitStruct;
 TIM_HandleTypeDef htim3;
+/* Это временная мера, чтобы можно было проверять работоспособность программы, 
+  пока я не придумаю нормальный способ. */
+static Stepper_InitStruct_t *__stepper;
 
-/* Functions */
+/* Control functions */
 
-void Stepper_Init(uint16_t period, uint32_t presc)
+void Stepper_Init(Stepper_InitStruct_t *stepper)
 {
-  TIM3_Config(period, presc);
-  GPIO_Config();
+  TIM3_Config(TIM3, stepper->period, stepper->presc);
+  GPIO_Config(stepper->gpios);
+  stepper->__state = STEPPER_STATE_READY;
+  __stepper = stepper;
 }
 
-void Stepper_Step(int steps, StepperDirec direc, StepperModes mode)
+void Stepper_Step(Stepper_InitStruct_t *stepper, int steps, StepperDirec direc, StepperModes mode)
 {
-    current_direc = direc;
-    current_mode = mode;
     volatile uint8_t size_;
 
     switch (mode)
     {
         case STEPPER_MODE_WAVE:
-            current_buffer.array = PinConf_Wavemode;
+            stepper->__buffer.array = PinConf_Wavemode;
             size_ = 4;
             break;
         case STEPPER_MODE_STEP:
-            current_buffer.array = PinConf_Stepmode;
+            stepper->__buffer.array = PinConf_Stepmode;
             size_ = 4;
             break;
         case STEPPER_MODE_HALFSTEP:
-            current_buffer.array = PinConf_HalfStepmode;
+            stepper->__buffer.array = PinConf_HalfStepmode;
             size_ = 7;
             break;
     }
-    current_buffer.size = size_;
-    current_buffer.index = !direc ? 0 : size_-1;
-    steps_left = (mode != STEPPER_MODE_HALFSTEP ? steps : steps*2);
+    stepper->__buffer.size = size_;
+    stepper->__buffer.index = !direc ? 0 : size_-1;
+    stepper->__steps_left = steps;
+    stepper->__direc = direc;
+    stepper->__mode = mode;
     HAL_TIM_Base_Start_IT(&htim3);
+    Stepper_SetState(stepper, STEPPER_STATE_RUNNING); 
 }
 
-void Stepper_GetMode(void)
+void Stepper_Halt(Stepper_InitStruct_t *stepper)
 {
-  return current_mode;
+  Stepper_SetState(stepper, STEPPER_STATE_HALTED);
 }
 
-void Stepper_GetDirec(void)
+void Stepper_Resume(Stepper_InitStruct_t *stepper)
 {
-  return current_direc;
+  Stepper_SetState(stepper, STEPPER_STATE_RUNNING);
+}
+
+void Stepper_PollForFinish(Stepper_InitStruct_t *stepper)
+{
+  while (Stepper_GetState(stepper) == STEPPER_STATE_RUNNING) __asm("");
+}
+
+/* Getters and setters */
+
+StepperModes Stepper_GetMode(Stepper_InitStruct_t stepper)
+{
+  return stepper.__mode;
+}
+
+StepperDirec Stepper_GetDirec(Stepper_InitStruct_t stepper)
+{
+  return stepper.__direc;
+}
+
+Stepper_State Stepper_GetState(Stepper_InitStruct_t *stepper)
+{
+  return stepper->__state;
+}
+
+void Stepper_SetState(Stepper_InitStruct_t *stepper, Stepper_State state)
+{
+  stepper->__state = state;
 }
 
 /* Interrupt handlers and callbacks */
@@ -92,26 +119,31 @@ void TIM3_IRQHandler(void)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 {
     if (htim->Instance == TIM3) {
-        GPIOA->ODR &= ~GPIO_MASK;
-        if (steps_left == 0) {
-            HAL_TIM_Base_Stop_IT(&htim3);
-            return;
-        }
-        
-        volatile uint32_t next_conf;
-        if (current_direc == STEPPER_DIRECTION_FORWARD)
-            next_conf = CircBuffer_Next(&current_buffer);
-        else if (current_direc == STEPPER_DIRECTION_REVERSE)
-            next_conf = CircBuffer_Prev(&current_buffer);
+      if (Stepper_GetState(__stepper) != STEPPER_STATE_RUNNING) return;
 
-        GPIOA->ODR |= next_conf;
-        if (steps_left != RUN_INDEFINETLY) steps_left--;
+      GPIOA->ODR &= ~GPIO_MASK;
+      if (__stepper->__steps_left == 0) {
+          HAL_TIM_Base_Stop_IT(&htim3);
+          Stepper_SetState(__stepper, STEPPER_STATE_READY);
+          return;
+      }
+
+      volatile uint32_t next_conf;
+      if (__stepper->__direc == STEPPER_DIRECTION_FORWARD)
+          next_conf = CircBuffer_Next(&__stepper->__buffer);
+      else if (__stepper->__direc == STEPPER_DIRECTION_REVERSE)
+          next_conf = CircBuffer_Prev(&__stepper->__buffer);
+
+      GPIOA->ODR |= next_conf;
+      if (__stepper->__steps_left != RUN_INDEFINETLY) __stepper->__steps_left--;
     }
 }
 
-void TIM3_Config(uint16_t period, uint32_t presc)
+/* Peripherals configuration */
+
+void TIM3_Config(TIM_TypeDef *tim, uint16_t period, uint32_t presc)
 {
-  htim3.Instance = TIM3;
+  htim3.Instance = tim;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
@@ -132,16 +164,9 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim)
   HAL_NVIC_EnableIRQ(TIM3_IRQn);
 }
 
-void GPIO_Config(void)
+void GPIO_Config(uint16_t *iPins)
 {
   __HAL_RCC_GPIOA_CLK_ENABLE();
-
-  uint16_t iPins[4] = {
-    GPIO_PIN_0,
-    GPIO_PIN_1,
-    GPIO_PIN_2,
-    GPIO_PIN_3
-  };
 
   for (int i = 0; i < 4; i++) {
     GPIO_InitStruct.Pin = iPins[i];

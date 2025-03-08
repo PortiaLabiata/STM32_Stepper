@@ -14,6 +14,8 @@
 
 /* Macroses */
 
+#define STEPPER_POLL_FOR_FINISH() while (Stepper_GetState(&stepper) == STEPPER_STATE_RUNNING) ;
+
 /* Magic numbers */
 
 #define GPIO_MASK 0b1111L;
@@ -30,12 +32,45 @@ typedef enum {
     STEPPER_DIRECTION_REVERSE
 } StepperDirec;
 
-void Stepper_Init(uint16_t period, uint32_t presc);
-void Stepper_Step(int steps, StepperDirec direc, StepperModes mode);
+typedef enum {
+    STEPPER_STATE_READY,
+    STEPPER_STATE_RUNNING,
+    STEPPER_STATE_HALTED
+} Stepper_State;
 
-void TIM3_Config(uint16_t period, uint32_t presc);
-void GPIO_Config(void);
 
+typedef struct {
+    uint16_t *gpios;
+    uint16_t period;
+    uint32_t presc;
+    Stepper_State __state;
+    circular_buffer_t __buffer;
+    StepperModes __mode;
+    StepperDirec __direc;
+    uint32_t __steps_left;
+} Stepper_InitStruct_t;
+
+/* Global variables */
+
+/* Control functions */
+
+void Stepper_Init(Stepper_InitStruct_t *stepper);
+void Stepper_Step(Stepper_InitStruct_t *stepper, int steps, StepperDirec direc, StepperModes mode);
+void Stepper_Halt(Stepper_InitStruct_t *stepper);
+void Stepper_Resume(Stepper_InitStruct_t *stepper);
+void Stepper_PollForFinish(Stepper_InitStruct_t *stepper);
+
+/* Getters and setters */
+
+StepperModes Stepper_GetMode(Stepper_InitStruct_t stepper);
+StepperDirec Stepper_GetDirec(Stepper_InitStruct_t stepper);
+Stepper_State Stepper_GetState(Stepper_InitStruct_t *stepper);
+void Stepper_SetState(Stepper_InitStruct_t *stepper, Stepper_State state);
+
+/* Peripherals configuration */
+
+void TIM3_Config(TIM_TypeDef *tim, uint16_t period, uint32_t presc);
+void GPIO_Config(uint16_t *iPins);
 void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim);
 
 #endif
