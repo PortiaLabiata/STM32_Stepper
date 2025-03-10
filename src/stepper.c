@@ -83,7 +83,7 @@ ConfigState Stepper_Step(Stepper_InitStruct_t *stepper, int steps, StepperDirec 
 
 ConfigState Stepper_Pause(Stepper_InitStruct_t *stepper, Stepper_State hold)
 {
-  if (hold != STEPPER_STATE_HOLDING || hold != STEPPER_STATE_FREE) 
+  if (hold != STEPPER_STATE_HOLDING && hold != STEPPER_STATE_FREE) 
     return STEPPER_ERROR_CONTROL;
   Stepper_SetState(stepper, hold);
   return STEPPER_OK;
@@ -128,7 +128,7 @@ Stepper_State Stepper_GetState(Stepper_InitStruct_t stepper)
 
 ConfigState Stepper_SetState(Stepper_InitStruct_t *stepper, Stepper_State state)
 {
-  if (state <= (uint8_t)STEPPER_OK || state >= (uint8_t)STEPPER_ERROR_CONFIG) 
+  if (state < (uint8_t)STEPPER_OK || state > (uint8_t)STEPPER_ERROR_CONFIG) 
     return STEPPER_ERROR_CONTROL;
   stepper->__state = state;
   return STEPPER_OK;
@@ -139,7 +139,7 @@ ConfigState Stepper_SetState(Stepper_InitStruct_t *stepper, Stepper_State state)
 ConfigState Stepper_SingleStep(TIM_HandleTypeDef *htim)
 {
   Stepper_InitStruct_t *stepper = NULL;
-  for (int i = 0; i <= MAX_STEPPERS; i++) {
+  for (int i = 0; i < MAX_STEPPERS; i++) {
     if (steppers[i] == NULL) break;
     if (steppers[i]->htim->Instance == htim->Instance) stepper = steppers[i];
   }
