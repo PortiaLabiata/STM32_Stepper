@@ -37,7 +37,7 @@ int main(void)
   Stepper_Step(&stepper2, 512, STEPPER_DIRECTION_FORWARD, mode_);
 
   HAL_Delay(500);
-  Stepper_Halt(&stepper2);
+  Stepper_Pause(&stepper2, STEPPER_STATE_HOLDING);
   HAL_Delay(500);
   Stepper_Resume(&stepper2);
 

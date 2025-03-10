@@ -37,12 +37,17 @@ typedef enum {
 typedef enum {
     STEPPER_STATE_READY,
     STEPPER_STATE_RUNNING,
-    STEPPER_STATE_HALTED
+    STEPPER_STATE_HOLDING,
+    STEPPER_STATE_FREE
 } Stepper_State;
 
 typedef enum {
     STEPPER_OK,
-    STEPPER_ERROR
+    STEPPER_ERROR_CONTROL,
+    STEPPER_ERROR_CONFIG,
+    STEPPER_INVALID_MODE,
+    STEPPER_INVALID_DIREC,
+    STEPPER_ERROR_RUNTIME // Может потом придумаю, что а этим делать, пока добавлю
 } ConfigState;
 
 
@@ -63,17 +68,18 @@ typedef struct {
 /* Control functions */
 
 ConfigState Stepper_Init(Stepper_InitStruct_t *stepper);
-void Stepper_Step(Stepper_InitStruct_t *stepper, int steps, StepperDirec direc, StepperModes mode);
-void Stepper_Halt(Stepper_InitStruct_t *stepper);
+ConfigState  Stepper_Step(Stepper_InitStruct_t *stepper, int steps, StepperDirec direc, StepperModes mode);
+ConfigState Stepper_Pause(Stepper_InitStruct_t *stepper, Stepper_State hold);
+ConfigState Stepper_Halt(Stepper_InitStruct_t *stepper);
 void Stepper_Resume(Stepper_InitStruct_t *stepper);
-void Stepper_PollForFinish(Stepper_InitStruct_t *stepper);
-void Stepper_SingleStep(TIM_HandleTypeDef *htim);
+ConfigState Stepper_PollForFinish(Stepper_InitStruct_t *stepper);
+ConfigState Stepper_SingleStep(TIM_HandleTypeDef *htim);
 
 /* Getters and setters */
 
 StepperModes Stepper_GetMode(Stepper_InitStruct_t stepper);
 StepperDirec Stepper_GetDirec(Stepper_InitStruct_t stepper);
 Stepper_State Stepper_GetState(Stepper_InitStruct_t stepper);
-void Stepper_SetState(Stepper_InitStruct_t *stepper, Stepper_State state);
+ConfigState Stepper_SetState(Stepper_InitStruct_t *stepper, Stepper_State state);
 
 #endif

@@ -35,7 +35,8 @@ static uint32_t steppers_num = 0;
 
 ConfigState Stepper_Init(Stepper_InitStruct_t *stepper)
 {
-  if (steppers_num > MAX_STEPPERS) return STEPPER_ERROR;
+  if (stepper == NULL) return STEPPER_ERROR_CONFIG;
+  if (steppers_num > MAX_STEPPERS) return STEPPER_ERROR_CONFIG;
 
   // TIM3_Config(TIM3, stepper->period, stepper->presc);
   // GPIO_Config(stepper->gpios);
@@ -45,8 +46,11 @@ ConfigState Stepper_Init(Stepper_InitStruct_t *stepper)
   return STEPPER_OK;
 }
 
-void Stepper_Step(Stepper_InitStruct_t *stepper, int steps, StepperDirec direc, StepperModes mode)
+ConfigState Stepper_Step(Stepper_InitStruct_t *stepper, int steps, StepperDirec direc, StepperModes mode)
 {
+    if (stepper == NULL ) return STEPPER_ERROR_CONTROL;
+    if (direc != STEPPER_DIRECTION_FORWARD || direc != STEPPER_DIRECTION_REVERSE) 
+      return STEPPER_INVALID_DIREC;
     volatile uint8_t size_;
 
     switch (mode)
@@ -63,6 +67,8 @@ void Stepper_Step(Stepper_InitStruct_t *stepper, int steps, StepperDirec direc, 
             stepper->__buffer.array = PinConf_HalfStepmode;
             size_ = 7;
             break;
+        default:
+          return STEPPER_INVALID_MODE;
     }
 
     stepper->__buffer.size = size_;
@@ -71,13 +77,24 @@ void Stepper_Step(Stepper_InitStruct_t *stepper, int steps, StepperDirec direc, 
     stepper->__direc = direc;
     stepper->__mode = mode;
 
-    HAL_TIM_Base_Start_IT(stepper->htim);
+    if (HAL_TIM_Base_Start_IT(stepper->htim) != HAL_OK) return STEPPER_ERROR_CONTROL;
     Stepper_SetState(stepper, STEPPER_STATE_RUNNING); 
 }
 
-void Stepper_Halt(Stepper_InitStruct_t *stepper)
+ConfigState Stepper_Pause(Stepper_InitStruct_t *stepper, Stepper_State hold)
 {
-  Stepper_SetState(stepper, STEPPER_STATE_HALTED);
+  if (hold != STEPPER_STATE_HOLDING || hold != STEPPER_STATE_FREE) 
+    return STEPPER_ERROR_CONTROL;
+  Stepper_SetState(stepper, hold);
+  return STEPPER_OK;
+}
+
+ConfigState Stepper_Halt(Stepper_InitStruct_t *stepper)
+{
+  if (HAL_TIM_Base_Stop_IT(stepper->htim) != HAL_OK) 
+    return STEPPER_ERROR_CONTROL;
+  Stepper_SetState(stepper, STEPPER_STATE_READY);
+  return STEPPER_OK;
 }
 
 void Stepper_Resume(Stepper_InitStruct_t *stepper)
@@ -85,9 +102,11 @@ void Stepper_Resume(Stepper_InitStruct_t *stepper)
   Stepper_SetState(stepper, STEPPER_STATE_RUNNING);
 }
 
-void Stepper_PollForFinish(Stepper_InitStruct_t *stepper)
+ConfigState Stepper_PollForFinish(Stepper_InitStruct_t *stepper)
 {
+  if (stepper == NULL) return STEPPER_ERROR_CONTROL;
   while (Stepper_GetState(*stepper) == STEPPER_STATE_RUNNING) __asm("");
+  return STEPPER_OK;
 }
 
 /* Getters and setters */
@@ -107,28 +126,38 @@ Stepper_State Stepper_GetState(Stepper_InitStruct_t stepper)
   return stepper.__state;
 }
 
-void Stepper_SetState(Stepper_InitStruct_t *stepper, Stepper_State state)
+ConfigState Stepper_SetState(Stepper_InitStruct_t *stepper, Stepper_State state)
 {
+  if (state <= (uint8_t)STEPPER_OK || state >= (uint8_t)STEPPER_ERROR_CONFIG) 
+    return STEPPER_ERROR_CONTROL;
   stepper->__state = state;
+  return STEPPER_OK;
 }
 
 /* Hardware functions */
 
-void Stepper_SingleStep(TIM_HandleTypeDef *htim)
+ConfigState Stepper_SingleStep(TIM_HandleTypeDef *htim)
 {
-  Stepper_InitStruct_t *stepper = {0};
+  Stepper_InitStruct_t *stepper = NULL;
   for (int i = 0; i <= MAX_STEPPERS; i++) {
     if (steppers[i] == NULL) break;
     if (steppers[i]->htim->Instance == htim->Instance) stepper = steppers[i];
   }
+  if (stepper == NULL) return STEPPER_ERROR_CONTROL;
 
-  if (Stepper_GetState(*stepper) != STEPPER_STATE_RUNNING) return;
+  /* Не уверен, хорошее ли это решение, всё таки тут целых два обращения к структуре,
+    да ещё и два захода в функцию */
+  if (Stepper_GetState(*stepper) == STEPPER_STATE_FREE) {
+    GPIOA->ODR &= ~GPIO_MASK;
+    return STEPPER_OK;
+  } else if (Stepper_GetState(*stepper) == STEPPER_STATE_HOLDING) {
+    return STEPPER_OK;
+  }
 
-  GPIOA->ODR &= ~GPIO_MASK;
   if (stepper->__steps_left == 0) {
-      HAL_TIM_Base_Stop_IT(stepper->htim);
+      if (HAL_TIM_Base_Stop_IT(stepper->htim) != HAL_OK) return STEPPER_ERROR_CONTROL;
       Stepper_SetState(stepper, STEPPER_STATE_READY);
-      return;
+      return STEPPER_OK;
   }
 
   if (stepper->__direc == STEPPER_DIRECTION_FORWARD)
@@ -137,4 +166,5 @@ void Stepper_SingleStep(TIM_HandleTypeDef *htim)
       GPIOA->ODR |= CircBuffer_Prev(&stepper->__buffer);
 
   if (stepper->__steps_left != RUN_INDEFINITELY) stepper->__steps_left--;
+  return STEPPER_OK;
 }
