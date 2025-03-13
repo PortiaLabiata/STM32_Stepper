@@ -41,12 +41,20 @@ typedef enum {
     STEPPER_STATE_FREE
 } Stepper_State;
 
+/*
+    STEPPER_OK - Everything went as planned;
+    STEPPER_ERROR_CONTROL - General control error, for example NULL values in one
+        of the arguments, invalid mode etc.
+    STEPPER_ERROR_HAL - HAL error, for example if peripheral devices were not 
+        configured correctly.
+    STEPPER_ERROR_RUNTIME - In development, for later use.
+*/
+
 typedef enum {
     STEPPER_OK,
     STEPPER_ERROR_CONTROL,
+    STEPPER_ERROR_HAL,
     STEPPER_ERROR_CONFIG,
-    STEPPER_INVALID_MODE,
-    STEPPER_INVALID_DIREC,
     STEPPER_ERROR_RUNTIME // Может потом придумаю, что а этим делать, пока добавлю
 } ConfigState;
 

@@ -48,9 +48,9 @@ ConfigState Stepper_Init(Stepper_InitStruct_t *stepper)
 
 ConfigState Stepper_Step(Stepper_InitStruct_t *stepper, int steps, StepperDirec direc, StepperModes mode)
 {
-    if (stepper == NULL ) return STEPPER_ERROR_CONTROL;
+    if (stepper == NULL) return STEPPER_ERROR_CONTROL;
     if (direc != STEPPER_DIRECTION_FORWARD || direc != STEPPER_DIRECTION_REVERSE) 
-      return STEPPER_INVALID_DIREC;
+      return STEPPER_ERROR_CONTROL;
     volatile uint8_t size_;
 
     switch (mode)
@@ -68,7 +68,7 @@ ConfigState Stepper_Step(Stepper_InitStruct_t *stepper, int steps, StepperDirec 
             size_ = 7;
             break;
         default:
-          return STEPPER_INVALID_MODE;
+          return STEPPER_ERROR_CONTROL;
     }
 
     stepper->__buffer.size = size_;
@@ -77,7 +77,7 @@ ConfigState Stepper_Step(Stepper_InitStruct_t *stepper, int steps, StepperDirec 
     stepper->__direc = direc;
     stepper->__mode = mode;
 
-    if (HAL_TIM_Base_Start_IT(stepper->htim) != HAL_OK) return STEPPER_ERROR_CONTROL;
+    if (HAL_TIM_Base_Start_IT(stepper->htim) != HAL_OK) return STEPPER_ERROR_HAL;
     Stepper_SetState(stepper, STEPPER_STATE_RUNNING); 
 }
 
@@ -92,7 +92,7 @@ ConfigState Stepper_Pause(Stepper_InitStruct_t *stepper, Stepper_State hold)
 ConfigState Stepper_Halt(Stepper_InitStruct_t *stepper)
 {
   if (HAL_TIM_Base_Stop_IT(stepper->htim) != HAL_OK) 
-    return STEPPER_ERROR_CONTROL;
+    return STEPPER_ERROR_HAL;
   Stepper_SetState(stepper, STEPPER_STATE_READY);
   return STEPPER_OK;
 }
@@ -139,7 +139,7 @@ ConfigState Stepper_SetState(Stepper_InitStruct_t *stepper, Stepper_State state)
 ConfigState Stepper_SingleStep(TIM_HandleTypeDef *htim)
 {
   Stepper_InitStruct_t *stepper = NULL;
-  for (int i = 0; i < MAX_STEPPERS; i++) {
+  for (int i = 0; i < steppers_num; i++) {
     if (steppers[i] == NULL) break;
     if (steppers[i]->htim->Instance == htim->Instance) stepper = steppers[i];
   }
@@ -155,7 +155,7 @@ ConfigState Stepper_SingleStep(TIM_HandleTypeDef *htim)
   }
 
   if (stepper->__steps_left == 0) {
-      if (HAL_TIM_Base_Stop_IT(stepper->htim) != HAL_OK) return STEPPER_ERROR_CONTROL;
+      if (HAL_TIM_Base_Stop_IT(stepper->htim) != HAL_OK) return STEPPER_ERROR_HAL;
       Stepper_SetState(stepper, STEPPER_STATE_READY);
       return STEPPER_OK;
   }
