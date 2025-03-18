@@ -15,11 +15,11 @@
 /* Macroses */
 
 #define STEPPER_POLL_FOR_FINISH(__STEPPER__) \
- while (Stepper_GetState(__STEPPER__) == STEPPER_STATE_RUNNING) ;
+ while (Stepper_GetState(__STEPPER__) == STEPPER_STATE_RUNNING) ; // This macro is unnecessary
 
 /* Magic numbers */
 
-#define GPIO_MASK 0b1111L;
+#define GPIO_MASK 0b1111L; // Mask to set GPIO pins to RESET state
 #define RUN_INDEFINITELY -1
 #define MAX_STEPPERS 4
 
