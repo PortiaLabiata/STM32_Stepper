@@ -2,13 +2,16 @@
 
 /* Pin configurations */
 
+/* Sequence of configurations for wave mode. One means that GPIO pin is on,
+0 - off (quite obvious). Pins (left to right) are pins[0] -: pins[3] */
 static const uint32_t PinConf_Wavemode[4] = {
     0b1000L,
     0b0100L,
     0b0010L,
     0b0001L
 };
-  
+
+/* Same for step mode */
 static const uint32_t PinConf_Stepmode[4] = {
     0b1001L,
     0b1100L,
@@ -16,6 +19,7 @@ static const uint32_t PinConf_Stepmode[4] = {
     0b0011L
 };
   
+/* Same for halfstep mode */
 static const uint32_t PinConf_HalfStepmode[7] = {
     0b1000L,
     0b1100L,
@@ -28,8 +32,16 @@ static const uint32_t PinConf_HalfStepmode[7] = {
 
 /* Global variables */
 
+/* Since I cannot know, which stepper corresponds to which timer from within the
+callback, I have to use this array of all possible steppers. Since I iterate over
+it in callback, it must be really small (<10), but it is I can hardly imagine more 
+than 4 steppers connected to the same controller, and if it is necessary, well,
+this number can be changed */
 static Stepper_InitStruct_t *steppers[MAX_STEPPERS];
 static uint32_t steppers_num = 0;
+
+/* TODO: add possibility to update steppers state inside main loop, not callback.
+Callback must only set flags for update. */
 
 /* Control functions */
 
@@ -46,6 +58,7 @@ ConfigState Stepper_Init(Stepper_InitStruct_t *stepper)
   return STEPPER_OK;
 }
 
+/* This function starts the stepper (w. m. the corresponding timer). */
 ConfigState Stepper_Step(Stepper_InitStruct_t *stepper, int steps, StepperDirec direc, StepperModes mode)
 {
     if (stepper == NULL) return STEPPER_ERROR_CONTROL;
@@ -81,6 +94,8 @@ ConfigState Stepper_Step(Stepper_InitStruct_t *stepper, int steps, StepperDirec 
     Stepper_SetState(stepper, STEPPER_STATE_RUNNING); 
 }
 
+/* Pauses stepper, but not the timer! Possible problems, when timer overflow
+encountered? TODO: Check that */
 ConfigState Stepper_Pause(Stepper_InitStruct_t *stepper, Stepper_State hold)
 {
   if (hold != STEPPER_STATE_HOLDING && hold != STEPPER_STATE_FREE) 
@@ -97,11 +112,18 @@ ConfigState Stepper_Halt(Stepper_InitStruct_t *stepper)
   return STEPPER_OK;
 }
 
+/* Resumes stepper movement after Stepper_Pause, but not Stepper_Halt,
+since it doesn't restart the timer */
 void Stepper_Resume(Stepper_InitStruct_t *stepper)
 {
   Stepper_SetState(stepper, STEPPER_STATE_RUNNING);
 }
 
+/* Busy waiting loop to wait until the stepper is done moving. Something like
+this (but not necessarily this function, since it may not work) is needed,
+because calling Stepper_Step again before stepper finished running might cause
+issues (like stepper changing (or not) it's running parameters and possible 
+unpredictable behaviour) */
 ConfigState Stepper_PollForFinish(Stepper_InitStruct_t *stepper)
 {
   if (stepper == NULL) return STEPPER_ERROR_CONTROL;
@@ -136,6 +158,11 @@ ConfigState Stepper_SetState(Stepper_InitStruct_t *stepper, Stepper_State state)
 
 /* Hardware functions */
 
+/* This function must be placed inside timer callback for stepper to update.
+Yes, it is quite massive, so I'm thinking, it might not be the best idea to 
+do it this way. Also, there are two possible direct register writes, that I did not
+yet think of how to rewrite with HAL functions. It decreases transferability and
+is overall bad codestyle, unless can't be avoided. Otherwise, it is relatively ok.  */
 ConfigState Stepper_SingleStep(TIM_HandleTypeDef *htim)
 {
   Stepper_InitStruct_t *stepper = NULL;
